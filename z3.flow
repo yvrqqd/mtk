@@ -1,0 +1,43 @@
+import runtime;
+import ds/array;
+
+
+fib_a(n : int) -> [int] {
+    if (n <= 1) {
+        [0];
+    } else if (n == 2) {
+        [0, 1];
+    } else {
+        tmp : [int] = fib_a(n-1);
+        concat(tmp, [tmp[n-3] + tmp[n-2]]);
+    } 
+}
+
+fib_b(n : int, arr : [int]) -> [int] {
+    if (n <= 2){
+        arr;
+    } else {
+        tmp : int = length(arr);
+        fib_b(n-1, concat(arr, [arr[tmp-2] + arr[tmp-1]]));
+    }
+}
+
+fib_c(n : int) -> [int] {
+    if (n <= 1) {
+        [0];
+    } else if (n == 2) {
+        [0, 1];
+    } else {
+        tmp : ref [int] = ref fib_a(n-1);
+        refArrayPush(tmp, ^tmp[n-3] + ^tmp[n-2]);
+        ^tmp;
+    } 
+}
+
+main() {
+    n : int = 10;
+	println(fib_a(n));
+    println(fib_b(n, [0, 1]));
+    println(fib_c(n));
+    quit(0);
+}

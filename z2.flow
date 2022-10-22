@@ -1,0 +1,8 @@
+import runtime;
+import ds/array;
+
+main() {
+	a : [int] = [1,2,3,4,5];
+	println(fold(a, 0, \x1, x2 -> x1 + x2));
+    quit(0);
+}
