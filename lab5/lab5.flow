@@ -1,0 +1,79 @@
+import lingo/pegcode/driver;
+import string;
+
+Expression ::= Add, Multiply, Number;
+
+Add (e1: Expression, e2: Expression);
+Multiply(e1: Expression, e2: Expression);
+Number(num: int);
+
+buildAdd(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Add(acc, x));
+}
+buildMult(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Multiply(acc, x));
+}
+specialPegActions = {
+	t = setTree(defaultPegActions.t, "buildAdd", buildAdd);
+    t2 = setTree(t, "buildMult", buildMult);
+	SemanticActions(t2);
+}
+
+exp_to_str(exp: Expression) -> string {
+    switch(exp){
+        Add (e1, e2): "(" + exp_to_str(e1) + "+" + exp_to_str(e2) + ")";
+        Multiply (e1, e2): "(" + exp_to_str(e1) + "*" + exp_to_str(e2) + ")";
+        Number (num): i2s(num);
+    }
+}
+
+calculate(exp : Expression) -> int {
+    switch(exp){
+        Add(e1, e2): calculate(e1) + calculate(e2);
+        Multiply(e1, e2): calculate(e1) * calculate(e2);
+        Number(num): num;
+    }
+}
+
+simplify(exp : Expression) -> Expression {
+    switch (exp) {
+        Add(e1, e2): {
+            if(e1 == Number(0)) {
+                simplify(e2);
+            } else if(e2 == Number(0)) {
+                simplify(e1);
+            } else {
+                Add(simplify(e1), simplify(e2)); 
+            }
+        }
+        Multiply(e1, e2): {
+            if (e1 == Number(0) || e2 == Number(0)) {
+                Number(0);
+            } else if(e2 == Number(1)) {
+                simplify(e1);
+            } else if(e1 == Number(1)){
+                simplify(e2);
+            } else {
+                Multiply(simplify(e1), simplify(e2));
+            }
+        }
+        default: exp;
+    }
+}
+
+lingoGrammarOp: ref Maybe<[PegOp]> = ref None();
+lingoGrammar() {
+	onlyOnce(lingoGrammarOp, \ -> {
+		compilePegGrammar("#include C:\Users\qqd-1\Desktop\mtk\z5.lingo");
+	});
+}
+
+main() {
+    exp: string = "(1+1+1) + 1*1*1*1";
+	  println("Input expression: " + exp + "\n");
+
+    ast = parsic(lingoGrammar(), exp, specialPegActions);
+
+    println("Answer: " +  i2s(calculate(ast)));
+    quit(0);
+}
