@@ -1,0 +1,8 @@
+exp = (mult | sum | number)+;
+
+sum = ws "+" ws {Add()};
+mult = ws "*" ws {Multiply()};
+number = ws digit+$d {Number(s2i($d))};
+
+ws = ' '*;
+digit = '0' - '9';
