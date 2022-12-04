@@ -1,0 +1,236 @@
+import lingo/pegcode/driver;
+import string;
+import ds/tree;
+
+Expression ::= Multiply, Divide, Add, Subtract, Negative, Variable, Number;
+
+Multiply:(e1: Expression, e2: Expression);
+Divide:(e1: Expression, e2: Expression);
+Add(e1: Expression, e2: Expression);
+Subtract(e1: Expression, e2: Expression);
+Negative(e: Expression);
+
+Variable(name: string);
+Number(num: int);
+Rational(e1: int, e2: int);
+
+
+buildSub(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Subtract(acc, x));
+}
+buildDiv(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Divide(acc, x));
+}
+buildAdd(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Add(acc, x));
+}
+buildMult(xs: [flow]) {
+    fold(xs[1], xs[0], \acc, x -> Multiply(acc, x));
+}
+specialPegActions = {
+	t = setTree(defaultPegActions.t, "buildAdd", buildAdd);
+    t2 = setTree(t, "buildSub", buildSub);
+    t3 = setTree(t2, "buildMult", buildMult);
+    t4 = setTree(t3, "buildDiv", buildDiv);
+	SemanticActions(t4);
+}
+
+exp_to_str(exp: Expression) -> string {
+    switch(exp) {
+        Multiply(e1, e2): "(" + exp_to_str(e1) + "*" + exp_to_str(e2) + ")";
+        Divide(e1, e2): "(" + exp_to_str(e1) + "/" + exp_to_str(e2) + ")";
+        Add(e1, e2): "(" + exp_to_str(e1) + "+" + exp_to_str(e2) + ")";
+        Subtract(e1, e2): "(" + exp_to_str(e1) + "-" + exp_to_str(e2) + ")";
+        Negative(e): "-" + exp_to_str(e);
+        Variable(e): e;
+        Number(e): i2s(e); 
+    }
+}
+
+r2s(a: Maybe<Rational>) -> string {
+    switch(a) {
+        Some(rat): {
+            if (rat.e2 == 1) {
+                i2s(rat.e1);
+            } else if (rat.e2 == 0) {
+                "div by 0";
+            } else {
+                i2s(rat.e1) + "/" + i2s(rat.e2);
+            }
+        }
+        None(): "None";
+    }
+}
+
+i2r(a: int) -> Rational {
+    Rational(a, 1);
+}
+
+divR(a: Rational, b: Rational) -> Rational {
+    Rational(a.e1 * b.e2, b.e1 * a.e2);
+}
+multR(a: Rational, b: Rational) -> Rational {
+    Rational(a.e1 * b.e1, b.e2 * a.e2);
+}
+addR(a: Rational, b: Rational) -> Rational {
+    Rational(a.e1 * b.e2 + b.e1 * a.e2, b.e2 * a.e2);
+}
+subR(a: Rational, b: Rational) -> Rational {
+    Rational(a.e1 * b.e2 - b.e1 * a.e2, b.e2 * a.e2);
+}
+negationR(a: Rational) -> Rational {
+    Rational(-a.e1, a.e2);
+}
+
+toNormRat(exp: Expression) -> Divide {
+    switch (exp) {
+        Divide(e1,e2): {
+            left = toNormRat(e1);
+            right = toNormRat(e2);
+            Divide(Multiply(left.e1, right.e2), Multiply(left.e2, right.e1));
+        }
+        Multiply(e1,e2): {
+            left = toNormRat(e1);
+            right = toNormRat(e2);
+            Divide(Multiply(left.e1, right.e1), Multiply(left.e2, right.e2));
+        }
+        Add(e1,e2): {
+            left = toNormRat(e1);
+            right = toNormRat(e2);
+             Divide(Add(Multiply(left.e1, right.e2), Multiply(right.e1, left.e2)), Multiply(left.e2, right.e2));
+        }
+        Subtract(e1,e2): {
+            left = toNormRat(e1);
+            right = toNormRat(e2);
+            Divide(Subtract(Multiply(left.e1, right.e2), Multiply(right.e1, left.e2)), Multiply(left.e2, right.e2));
+        }
+        Negative(e): {
+            val = toNormRat(e);
+            Divide(Negative(val.e1), val.e2);
+        }
+        Variable(e): Divide(Variable(e), Number(1));
+        Number(e): Divide(Number(e), Number(1));
+    }
+}
+
+differentiate(exp: Expression, var: string) -> Expression {
+    switch(exp) {
+        Add(e1, e2): Add(differentiate(e1, var), differentiate(e2, var));
+        Subtract(e1, e2): Subtract(differentiate(e1, var), differentiate(e2, var));
+        Multiply(e1, e2): Add(Multiply(differentiate(e1, var), e2), Multiply(differentiate(e2, var), e1));
+        Divide(e1, e2): Divide(Subtract(Multiply(differentiate(e1, var), e2), Multiply(differentiate(e2, var), e1)), Multiply(e2,e2));
+        Negative(e): Negative(differentiate(e, var));
+        Number(e): Number(0);
+        Variable(e): {
+            if (e == var) {
+                Number(1);
+            } else {
+                Number(0);
+            }
+        }
+    }
+
+}
+
+calculate(exp : Expression, vars : Tree<string, Rational>) -> Maybe<Rational> {
+    switch(exp) {
+        Multiply (e1, e2): maybeMap2(multR)(calculate(e1, vars), calculate(e2, vars));
+        Divide (e1, e2): maybeMap2(divR)(calculate(e1, vars), calculate(e2, vars));
+        Add (e1, e2): maybeMap2(addR)(calculate(e1, vars), calculate(e2, vars));
+        Subtract (e1, e2): maybeMap2(subR)(calculate(e1, vars), calculate(e2, vars));
+        Negative (e): maybeMap(calculate(e, vars), negationR);
+        Variable (e): lookupTree(vars, e);
+        Number(e):  Some(Rational(e,1));
+    }
+}
+
+simplify(exp: Expression) -> Expression {
+    switch(exp) {
+        Add(e1, e2): {
+            left: Expression = simplify(e1);
+            right: Expression = simplify(e2);
+            if (left == Number(0)) {
+                right;
+            } else if (right == Number(0)) {
+                left;
+            } else {
+                Add(left, right);
+            }
+        }
+        Subtract(e1, e2): {
+            left: Expression = simplify(e1);
+            right: Expression = simplify(e2);
+            if (left == Number(0)) {
+                Negative(right);
+            } else if (right == Number(0)) {
+                left;
+            } else if (right == left) {
+                Number(0);
+            } else {
+                Subtract(left, right);
+            }
+        }
+        Negative(e): {
+            value: Expression = simplify(e);
+            if (value == Number(0)) {
+                Number(0);
+            } else {
+                Negative(value);
+            }
+        }
+        Divide(e1, e2): {
+            left: Expression = simplify(e1);
+            right: Expression = simplify(e2);
+            if (left == Number(0)) {
+                Number(0);
+            } else if (left == right) {
+                Number(1);
+            } else if (right == Number(1)) {
+                left;
+            } else {
+                Divide(left, right);
+            }
+        }
+        Multiply(e1, e2): {
+            left: Expression = simplify(e1);
+            right: Expression = simplify(e2);
+            if (left == Number(0) || right == Number(0)) {
+                Number(0);
+            } else if (left == Number(1)) {
+                right;
+            } else if (right == Number(1)) {
+                left;
+            } else {
+                Multiply(left, right);
+            }
+        }
+        default: exp;
+        }
+}
+
+lingoGrammarOp: ref Maybe<[PegOp]> = ref None();
+lingoGrammar() {
+	onlyOnce(lingoGrammarOp, \ -> {
+		compilePegGrammar("#include C:\Users\qqd-1\Desktop\mtk\z9.lingo");
+	});
+}
+
+main() {
+    variables : Tree<string, Rational> = setTree(makeTree(), "x", Rational(1, 2));
+
+    exp = "2*x*4/1/1";
+
+	println("Input expression: " + exp + "\n");
+
+    ast = parsic(lingoGrammar(), exp, specialPegActions);
+
+    simplified = simplify(ast);
+    // println("nonSimplified: " + exp_to_str(ast) + "\n");    
+    println("Simplified: " + exp_to_str(simplified) + "\n");
+    println("In common form " + exp_to_str(toNormRat(simplified)) + "\n");
+    // println("derivative nonSimplified " + exp_to_str(differentiate(ast, "x")) + "\n");
+    // println("derivative Simplified " + exp_to_str(simplify(differentiate(ast, "x"))) + "\n");
+
+    println("Answer: " + r2s(calculate(simplified, variables)));
+    quit(0);
+}
