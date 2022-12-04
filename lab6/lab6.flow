@@ -1,0 +1,40 @@
+import lingo/pegcode/driver;
+import string;
+import ds/array;
+
+
+Expression::= Add, Multiply, Number;
+Add();
+Multiply();
+Number(val : int);
+
+calculate(exp : [Expression]) -> int {
+    rpn = foldi(exp, ref[], \i, stack, expr_i -> {
+            switch (expr_i) {
+                Add(): refArrayPush(stack, Pop(stack) + Pop(stack));            
+                Multiply(): refArrayPush(stack, Pop(stack) * Pop(stack));  
+                Number(num): refArrayPush(stack, num);          
+            }
+            stack;
+        });
+    Pop(rpn);
+}
+
+Pop(stack : ref [int]) -> int {
+   top : int = lastElement(^stack, 0);
+   stack := subrange(^stack, 0, length(^stack) - 1); 
+   top;
+}
+
+lingoGrammarOp: ref Maybe<[PegOp]> = ref None();
+lingoGrammar() {
+	onlyOnce(lingoGrammarOp, \ -> {
+		compilePegGrammar("#include C:\Users\qqd-1\Desktop\mtk\z6.lingo");
+	});
+}
+main() {
+    exp: string = "1 2 + 3 + 7 *";
+	println("Input expression: " + exp + "\n");
+    println("Answer: " + i2s(calculate(parsic(lingoGrammar(), exp, defaultPegActions))));
+    quit(0);
+}
