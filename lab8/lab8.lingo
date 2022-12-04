@@ -1,0 +1,22 @@
+exp = add;
+
+add = sub:e1 multadd*:e2 {buildAdd(:e1, :e2)} | sub;
+multadd = ws "+" ws sub:e {:e};
+
+sub = mult:e1 multsub*:e2 {buildSub(:e1, :e2)} | mult;
+multsub = ws "-" ws mult:e {:e};
+
+mult = div:e1 multmult*:e2 {buildMult(:e1, :e2)} | div;
+multmult = ws "*" ws div:e {:e};
+
+div = negative:e1 multdiv*:e2 {buildDiv(:e1, :e2)} | negative;
+multdiv = ws "/" ws negative:e {:e};
+
+negative = ws "-" negative:e {Negative(:e)} | node;
+
+node = ws "(" ws exp:e ws ")" ws {:e} | num | var;
+num = ws digit+$d ws {Number(s2i($d))};
+
+var = 'a'-'z'$d {Variable($d)};
+digit = '0'-'9';
+ws = (" " | "\t" | "\r" | "\n")*;
