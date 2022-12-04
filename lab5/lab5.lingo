@@ -1,0 +1,12 @@
+exp = add;
+add = mult:e1 multadd*:e2 {buildAdd(:e1, :e2)} | mult;
+multadd = ws "+" ws mult:e {:e};
+
+mult = node:e1 multmult*:e2 {buildMult(:e1, :e2)} | node;
+multmult = ws "*" ws node:e {:e};
+
+node = ws "(" ws exp:e ws ")" ws {:e} | num;
+num = ws digit+$d ws {Number(s2i($d))};
+
+digit = '0'-'9';
+ws = (" " | "\t" | "\r" | "\n")*;
